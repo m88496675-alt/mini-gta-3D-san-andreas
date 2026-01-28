@@ -17,7 +17,7 @@ html, body {
   top: 10px;
   left: 10px;
   color: white;
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   background: rgba(0,0,0,0.6);
   padding: 8px;
   z-index: 10;
@@ -26,180 +26,179 @@ html, body {
 </head>
 <body>
 <div id="ui">
-Estrellas: <span id="stars">0</span><br>
-WASD mover · Mouse cámara · E entrar coche
+⭐ <span id="stars">0</span><br>
+WASD mover / conducir · Mouse cámara · E entrar coche
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 <script>
-// ===== SETUP =====
+// ===== ESCENA =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(10, 20, 10);
+sun.position.set(10,20,10);
 scene.add(sun);
 
-// ===== MAP =====
+// ===== MAPA =====
 const MAP = 200;
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(MAP, MAP),
-  new THREE.MeshStandardMaterial({ color: 0x3fa34d })
+  new THREE.MeshStandardMaterial({ color:0x3fa34d })
 );
-floor.rotation.x = -Math.PI / 2;
+floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
-// ===== BUILDINGS =====
+// ===== EDIFICIOS =====
 const buildings = [];
-for (let i = 0; i < 60; i++) {
+for (let i=0;i<60;i++){
   const h = Math.random()*10+5;
   const b = new THREE.Mesh(
-    new THREE.BoxGeometry(5, h, 5),
-    new THREE.MeshStandardMaterial({ color: 0x777777 })
+    new THREE.BoxGeometry(5,h,5),
+    new THREE.MeshStandardMaterial({ color:0x777777 })
   );
   b.position.set(
     (Math.random()-0.5)*180,
     h/2,
     (Math.random()-0.5)*180
   );
-  b.userData.box = new THREE.Box3().setFromObject(b);
   buildings.push(b);
   scene.add(b);
 }
 
-// ===== INPUT =====
-const keys = {};
-window.addEventListener("keydown", e => keys[e.code] = true);
-window.addEventListener("keyup", e => keys[e.code] = false);
-
-// ===== CAMERA CONTROL =====
-let yaw = 0, pitch = 0;
-document.body.onclick = () => document.body.requestPointerLock();
-addEventListener("mousemove", e => {
-  if (document.pointerLockElement === document.body) {
-    yaw -= e.movementX * 0.002;
-    pitch -= e.movementY * 0.002;
-    pitch = THREE.MathUtils.clamp(pitch, -0.4, 0.5);
-  }
-});
-
-// ===== PLAYER =====
+// ===== JUGADOR =====
 const player = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.5,1),
-  new THREE.MeshStandardMaterial({ color: 0x3366ff })
+  new THREE.MeshStandardMaterial({ color:0x3366ff })
 );
 player.position.y = 1;
 scene.add(player);
 
-let playerVel = new THREE.Vector3();
-let yVel = 0;
-let onGround = true;
-
-// ===== VEHICLE =====
+// ===== COCHE =====
 const car = new THREE.Mesh(
   new THREE.BoxGeometry(2,1,4),
-  new THREE.MeshStandardMaterial({ color: 0xff0000 })
+  new THREE.MeshStandardMaterial({ color:0xff0000 })
 );
 car.position.set(5,0.5,5);
 scene.add(car);
 
-let inCar = false;
-let carSpeed = 0;
-let carDir = 0;
-
-// ===== POLICE =====
+// ===== POLICÍA =====
 const police = [];
 for (let i=0;i<3;i++){
   const p = car.clone();
-  p.material = new THREE.MeshStandardMaterial({ color: 0x0000ff });
-  p.position.set(Math.random()*50,0.5,Math.random()*50);
+  p.material = new THREE.MeshStandardMaterial({ color:0x0000ff });
+  p.position.set(Math.random()*30,0.5,Math.random()*30);
   police.push(p);
   scene.add(p);
 }
 
-// ===== GAME STATE =====
-let stars = 0;
-const starsUI = document.getElementById("stars");
+// ===== INPUT =====
+const keys = {};
+window.addEventListener("keydown", e=>keys[e.code]=true);
+window.addEventListener("keyup", e=>keys[e.code]=false);
 
-// ===== COLLISION =====
-function hitBuilding(pos){
-  const box = new THREE.Box3().setFromCenterAndSize(
-    new THREE.Vector3(pos.x,1,pos.z),
-    new THREE.Vector3(1,2,1)
+// ===== MOUSE =====
+let yaw=0, pitch=0;
+document.body.onclick=()=>document.body.requestPointerLock();
+window.addEventListener("mousemove", e=>{
+  if(document.pointerLockElement===document.body){
+    yaw -= e.movementX*0.002;
+    pitch -= e.movementY*0.002;
+    pitch = THREE.MathUtils.clamp(pitch,-0.4,0.5);
+  }
+});
+
+// ===== ESTADO =====
+let inCar=false;
+let playerVel=new THREE.Vector3();
+let yVel=0;
+let carSpeed=0;
+let carDir=0;
+let stars=0;
+const starsUI=document.getElementById("stars");
+
+// ===== COLISIONES =====
+function boxFrom(obj, size){
+  return new THREE.Box3().setFromCenterAndSize(
+    new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z),
+    size
   );
-  return buildings.some(b => box.intersectsBox(b.userData.box));
+}
+
+function hitBuildings(box){
+  return buildings.some(b=>{
+    const bb = new THREE.Box3().setFromObject(b);
+    return box.intersectsBox(bb);
+  });
 }
 
 // ===== LOOP =====
 function animate(){
   requestAnimationFrame(animate);
 
-  if (!inCar) {
-    const forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-    if (keys.KeyW) playerVel.addScaledVector(forward,0.04);
-    if (keys.KeyS) playerVel.addScaledVector(forward,-0.04);
-
+  if(!inCar){
+    const forward=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    if(keys.KeyW) playerVel.addScaledVector(forward,0.04);
+    if(keys.KeyS) playerVel.addScaledVector(forward,-0.04);
     playerVel.multiplyScalar(0.85);
-    const next = player.position.clone().add(playerVel);
-    if (!hitBuilding(next)) player.position.copy(next);
 
-    if (keys.Space && onGround) { yVel = 0.5; onGround=false; }
-    yVel -= 0.03;
-    player.position.y += yVel;
-    if (player.position.y < 1) { player.position.y=1; yVel=0; onGround=true; }
+    const next=player.position.clone().add(playerVel);
+    const pBox=boxFrom({position:next}, new THREE.Vector3(1,2,1));
+    if(!hitBuildings(pBox)) player.position.copy(next);
 
-    if (keys.KeyE && player.position.distanceTo(car.position) < 2) inCar=true;
-  }
+    if(keys.KeyE && player.position.distanceTo(car.position)<2) inCar=true;
+  } else {
+    if(keys.KeyW) carSpeed+=0.01;
+    if(keys.KeyS) carSpeed-=0.01;
+    carSpeed*=0.98;
+    if(keys.KeyA) carDir+=0.03;
+    if(keys.KeyD) carDir-=0.03;
 
-  else {
-    if (keys.KeyW) carSpeed += 0.01;
-    if (keys.KeyS) carSpeed -= 0.01;
-    carSpeed *= 0.98;
-    if (keys.KeyA) carDir += 0.03;
-    if (keys.KeyD) carDir -= 0.03;
+    const nextCar = car.position.clone();
+    nextCar.x += Math.sin(carDir)*carSpeed;
+    nextCar.z += Math.cos(carDir)*carSpeed;
 
-    car.rotation.y = carDir;
-    car.position.x += Math.sin(carDir)*carSpeed;
-    car.position.z += Math.cos(carDir)*carSpeed;
+    const cBox=boxFrom({position:nextCar}, new THREE.Vector3(2,1,4));
+    if(!hitBuildings(cBox)){
+      car.position.copy(nextCar);
+    } else {
+      carSpeed=0;
+      stars=Math.min(3, stars+0.5);
+    }
 
+    car.rotation.y=carDir;
     player.position.copy(car.position);
-
-    if (keys.KeyE) inCar=false;
-    if (Math.abs(carSpeed) > 0.2) stars = Math.min(3, stars+0.001);
+    if(keys.KeyE) inCar=false;
   }
 
-  // POLICE CHASE
-  if (stars > 0) {
+  if(stars>0){
     police.forEach(p=>{
-      const dir = player.position.clone().sub(p.position).normalize();
+      const dir=player.position.clone().sub(p.position).normalize();
       p.position.addScaledVector(dir,0.05);
     });
   }
 
-  starsUI.textContent = stars.toFixed(1);
+  starsUI.textContent=stars.toFixed(1);
 
-  // CAMERA
-  const camTarget = (inCar?car.position:player.position);
-  const camPos = new THREE.Vector3(
-    Math.sin(yaw)*-8,
-    5,
-    Math.cos(yaw)*-8
-  ).add(camTarget);
+  const target=inCar?car.position:player.position;
+  const camPos=new THREE.Vector3(
+    Math.sin(yaw)*-8,5,Math.cos(yaw)*-8
+  ).add(target);
   camera.position.lerp(camPos,0.1);
-  camera.lookAt(camTarget);
+  camera.lookAt(target);
 
   renderer.render(scene,camera);
 }
 animate();
 
-addEventListener("resize",()=>{
-  camera.aspect = innerWidth/innerHeight;
+window.addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
