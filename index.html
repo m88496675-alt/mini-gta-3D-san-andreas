@@ -19,178 +19,189 @@ html, body {
   color: white;
   font-family: Arial, sans-serif;
   background: rgba(0,0,0,0.6);
-  padding: 6px 10px;
+  padding: 8px;
   z-index: 10;
 }
 </style>
 </head>
 <body>
-<div id="ui">WASD mover • Mouse cámara • Espacio saltar</div>
+<div id="ui">
+Estrellas: <span id="stars">0</span><br>
+WASD mover · Mouse cámara · E entrar coche
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 <script>
-// ESCENA
+// ===== SETUP =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
-// CÁMARA
-const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
-
-// RENDER
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// LUCES
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.position.set(10, 20, 10);
 scene.add(sun);
 
-// MAPA
-const MAP_SIZE = 200;
-
-// SUELO
+// ===== MAP =====
+const MAP = 200;
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE),
+  new THREE.PlaneGeometry(MAP, MAP),
   new THREE.MeshStandardMaterial({ color: 0x3fa34d })
 );
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-// CARRETERA
-const road = new THREE.Mesh(
-  new THREE.PlaneGeometry(20, MAP_SIZE),
-  new THREE.MeshStandardMaterial({ color: 0x222222 })
-);
-road.rotation.x = -Math.PI / 2;
-road.position.y = 0.01;
-scene.add(road);
-
-// LINEAS VIALES
-for (let z = -MAP_SIZE/2; z < MAP_SIZE/2; z += 10) {
-  const line = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 4),
-    new THREE.MeshBasicMaterial({ color: 0xffffff })
-  );
-  line.rotation.x = -Math.PI / 2;
-  line.position.set(0, 0.02, z);
-  scene.add(line);
-}
-
-// EDIFICIOS
-for (let i = 0; i < 80; i++) {
-  const h = Math.random() * 10 + 4;
-  const building = new THREE.Mesh(
-    new THREE.BoxGeometry(4, h, 4),
+// ===== BUILDINGS =====
+const buildings = [];
+for (let i = 0; i < 60; i++) {
+  const h = Math.random()*10+5;
+  const b = new THREE.Mesh(
+    new THREE.BoxGeometry(5, h, 5),
     new THREE.MeshStandardMaterial({ color: 0x777777 })
   );
-
-  building.position.set(
-    (Math.random() - 0.5) * 180,
-    h / 2,
-    (Math.random() - 0.5) * 180
+  b.position.set(
+    (Math.random()-0.5)*180,
+    h/2,
+    (Math.random()-0.5)*180
   );
-
-  scene.add(building);
+  b.userData.box = new THREE.Box3().setFromObject(b);
+  buildings.push(b);
+  scene.add(b);
 }
 
-// JUGADOR
-const player = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.5, 1, 4, 8),
-  new THREE.MeshStandardMaterial({ color: 0x3366ff })
-);
-player.position.set(0, 2, 0);
-scene.add(player);
-
-// INPUT
+// ===== INPUT =====
 const keys = {};
-addEventListener("keydown", e => keys[e.code] = true);
-addEventListener("keyup", e => keys[e.code] = false);
+window.addEventListener("keydown", e => keys[e.code] = true);
+window.addEventListener("keyup", e => keys[e.code] = false);
 
-// MOUSE
-let yaw = 0;
-let pitch = 0;
-
+// ===== CAMERA CONTROL =====
+let yaw = 0, pitch = 0;
 document.body.onclick = () => document.body.requestPointerLock();
-
 addEventListener("mousemove", e => {
   if (document.pointerLockElement === document.body) {
     yaw -= e.movementX * 0.002;
     pitch -= e.movementY * 0.002;
-    pitch = Math.max(-0.4, Math.min(0.5, pitch));
+    pitch = THREE.MathUtils.clamp(pitch, -0.4, 0.5);
   }
 });
 
-// FÍSICA
-const velocity = new THREE.Vector3();
-let velocityY = 0;
+// ===== PLAYER =====
+const player = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.5,1),
+  new THREE.MeshStandardMaterial({ color: 0x3366ff })
+);
+player.position.y = 1;
+scene.add(player);
 
-const ACCEL = 0.04;
-const MAX_SPEED = 0.25;
-const FRICTION = 0.85;
-const GRAVITY = -0.03;
-const JUMP = 0.55;
+let playerVel = new THREE.Vector3();
+let yVel = 0;
+let onGround = true;
 
-let onGround = false;
+// ===== VEHICLE =====
+const car = new THREE.Mesh(
+  new THREE.BoxGeometry(2,1,4),
+  new THREE.MeshStandardMaterial({ color: 0xff0000 })
+);
+car.position.set(5,0.5,5);
+scene.add(car);
 
-// CÁMARA SUAVE
-const camPos = new THREE.Vector3();
+let inCar = false;
+let carSpeed = 0;
+let carDir = 0;
 
-// LOOP
-function animate() {
-  requestAnimationFrame(animate);
-
-  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-
-  if (keys.KeyW) velocity.addScaledVector(forward, ACCEL);
-  if (keys.KeyS) velocity.addScaledVector(forward, -ACCEL);
-  if (keys.KeyA) velocity.addScaledVector(right, -ACCEL);
-  if (keys.KeyD) velocity.addScaledVector(right, ACCEL);
-
-  velocity.clampLength(0, MAX_SPEED);
-  velocity.multiplyScalar(FRICTION);
-  player.position.add(velocity);
-
-  if (keys.Space && onGround) {
-    velocityY = JUMP;
-    onGround = false;
-  }
-
-  velocityY += GRAVITY;
-  player.position.y += velocityY;
-
-  if (player.position.y < 1) {
-    player.position.y = 1;
-    velocityY = 0;
-    onGround = true;
-  }
-
-  const limit = MAP_SIZE / 2 - 2;
-  player.position.x = THREE.MathUtils.clamp(player.position.x, -limit, limit);
-  player.position.z = THREE.MathUtils.clamp(player.position.z, -limit, limit);
-
-  const desiredCam = new THREE.Vector3(
-    Math.sin(yaw) * -7,
-    4 + pitch * 4,
-    Math.cos(yaw) * -7
-  ).add(player.position);
-
-  camPos.lerp(desiredCam, 0.1);
-  camera.position.copy(camPos);
-  camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
-
-  renderer.render(scene, camera);
+// ===== POLICE =====
+const police = [];
+for (let i=0;i<3;i++){
+  const p = car.clone();
+  p.material = new THREE.MeshStandardMaterial({ color: 0x0000ff });
+  p.position.set(Math.random()*50,0.5,Math.random()*50);
+  police.push(p);
+  scene.add(p);
 }
 
+// ===== GAME STATE =====
+let stars = 0;
+const starsUI = document.getElementById("stars");
+
+// ===== COLLISION =====
+function hitBuilding(pos){
+  const box = new THREE.Box3().setFromCenterAndSize(
+    new THREE.Vector3(pos.x,1,pos.z),
+    new THREE.Vector3(1,2,1)
+  );
+  return buildings.some(b => box.intersectsBox(b.userData.box));
+}
+
+// ===== LOOP =====
+function animate(){
+  requestAnimationFrame(animate);
+
+  if (!inCar) {
+    const forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    if (keys.KeyW) playerVel.addScaledVector(forward,0.04);
+    if (keys.KeyS) playerVel.addScaledVector(forward,-0.04);
+
+    playerVel.multiplyScalar(0.85);
+    const next = player.position.clone().add(playerVel);
+    if (!hitBuilding(next)) player.position.copy(next);
+
+    if (keys.Space && onGround) { yVel = 0.5; onGround=false; }
+    yVel -= 0.03;
+    player.position.y += yVel;
+    if (player.position.y < 1) { player.position.y=1; yVel=0; onGround=true; }
+
+    if (keys.KeyE && player.position.distanceTo(car.position) < 2) inCar=true;
+  }
+
+  else {
+    if (keys.KeyW) carSpeed += 0.01;
+    if (keys.KeyS) carSpeed -= 0.01;
+    carSpeed *= 0.98;
+    if (keys.KeyA) carDir += 0.03;
+    if (keys.KeyD) carDir -= 0.03;
+
+    car.rotation.y = carDir;
+    car.position.x += Math.sin(carDir)*carSpeed;
+    car.position.z += Math.cos(carDir)*carSpeed;
+
+    player.position.copy(car.position);
+
+    if (keys.KeyE) inCar=false;
+    if (Math.abs(carSpeed) > 0.2) stars = Math.min(3, stars+0.001);
+  }
+
+  // POLICE CHASE
+  if (stars > 0) {
+    police.forEach(p=>{
+      const dir = player.position.clone().sub(p.position).normalize();
+      p.position.addScaledVector(dir,0.05);
+    });
+  }
+
+  starsUI.textContent = stars.toFixed(1);
+
+  // CAMERA
+  const camTarget = (inCar?car.position:player.position);
+  const camPos = new THREE.Vector3(
+    Math.sin(yaw)*-8,
+    5,
+    Math.cos(yaw)*-8
+  ).add(camTarget);
+  camera.position.lerp(camPos,0.1);
+  camera.lookAt(camTarget);
+
+  renderer.render(scene,camera);
+}
 animate();
 
-// RESIZE
-addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight;
+addEventListener("resize",()=>{
+  camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
 });
 </script>
 </body>
