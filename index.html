@@ -2,124 +2,105 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Mini GTA 3D</title>
+<title>Mini GTA 3D – Base Estable</title>
 <style>
-body{margin:0;overflow:hidden;background:#000}
-#hud{position:fixed;top:10px;left:10px;color:#fff;font-family:Arial;background:rgba(0,0,0,.6);padding:8px;border-radius:6px;font-size:14px}
+html,body{margin:0;padding:0;overflow:hidden;background:#000}
+#hud{position:fixed;top:10px;left:10px;color:#fff;font-family:Arial;background:rgba(0,0,0,.6);padding:8px;border-radius:6px;font-size:14px;z-index:10}
 </style>
 </head>
 <body>
-<div id="hud">Cargando…</div>
+<div id="hud">Click para empezar</div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 <script>
+// =================== SEGURIDAD BÁSICA ===================
+try{
+
 // =================== ESCENA ===================
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x87ceeb);
-const camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(window.innerWidth,window.innerHeight);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+
 window.addEventListener('resize',()=>{
- camera.aspect=window.innerWidth/window.innerHeight;
+ camera.aspect = window.innerWidth/window.innerHeight;
  camera.updateProjectionMatrix();
- renderer.setSize(window.innerWidth,window.innerHeight);
+ renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // =================== LUCES ===================
-scene.add(new THREE.AmbientLight(0xffffff,0.6));
-const sun=new THREE.DirectionalLight(0xffffff,1);
+scene.add(new THREE.AmbientLight(0xffffff,0.7));
+const sun = new THREE.DirectionalLight(0xffffff,1);
 sun.position.set(10,20,10);
 scene.add(sun);
 
 // =================== SUELO ===================
-const floor=new THREE.Mesh(
- new THREE.PlaneGeometry(500,500),
+const floor = new THREE.Mesh(
+ new THREE.PlaneGeometry(400,400),
  new THREE.MeshStandardMaterial({color:0x3a8f3a})
 );
-floor.rotation.x=-Math.PI/2;
+floor.rotation.x = -Math.PI/2;
 scene.add(floor);
 
 // =================== EDIFICIOS ===================
-const buildings=[];
-for(let i=0;i<40;i++){
- const w=5+Math.random()*10;
- const h=5+Math.random()*30;
- const d=5+Math.random()*10;
- const b=new THREE.Mesh(
-  new THREE.BoxGeometry(w,h,d),
-  new THREE.MeshStandardMaterial({color:0x6b6b6b})
+const buildings = [];
+for(let i=0;i<20;i++){
+ const h = 5 + Math.random()*20;
+ const b = new THREE.Mesh(
+  new THREE.BoxGeometry(6,h,6),
+  new THREE.MeshStandardMaterial({color:0x777777})
  );
- b.position.set((Math.random()-.5)*200,h/2,(Math.random()-.5)*200);
+ b.position.set((Math.random()-.5)*150, h/2, (Math.random()-.5)*150);
  scene.add(b);
  buildings.push(b);
 }
 
 // =================== JUGADOR ===================
-const player=new THREE.Mesh(
- new THREE.CapsuleGeometry(0.5,1.5,4,8),
+const player = new THREE.Mesh(
+ new THREE.BoxGeometry(1,2,1),
  new THREE.MeshStandardMaterial({color:0x0077ff})
 );
 player.position.set(0,1,0);
 scene.add(player);
-let velocity=new THREE.Vector3();
 
 // =================== COCHE ===================
-const car=new THREE.Mesh(
+const car = new THREE.Mesh(
  new THREE.BoxGeometry(2,1,4),
  new THREE.MeshStandardMaterial({color:0xff0000})
 );
 car.position.set(5,0.5,5);
 scene.add(car);
-let carSpeed=0;
-let carHealth=100;
-let carDestroyed=false;
 
-// =================== POLICIA ===================
-const cops=[];
-let stars=0;
-for(let i=0;i<3;i++){
- const c=new THREE.Mesh(
-  new THREE.BoxGeometry(2,1,4),
-  new THREE.MeshStandardMaterial({color:0x0000ff})
- );
- c.position.set((Math.random()-.5)*100,0.5,(Math.random()-.5)*100);
- scene.add(c);
- cops.push(c);
-}
+let carSpeed = 0;
+let carHealth = 100;
+let carDestroyed = false;
 
 // =================== CONTROLES ===================
-const keys={};
-document.addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
-document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+const keys = {};
+window.addEventListener('keydown',e=>keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()] = false);
 
-let yaw=Math.PI;
-let pitch=0;
-let inCar=false;
+let yaw = Math.PI;
+let inCar = false;
 
 renderer.domElement.addEventListener('click',()=>{
  renderer.domElement.requestPointerLock();
 });
 
 document.addEventListener('mousemove',e=>{
- if(document.pointerLockElement!==renderer.domElement)return;
- yaw-=e.movementX*0.002;
- pitch-=e.movementY*0.002;
- pitch=Math.max(-1,Math.min(1,pitch));
+ if(document.pointerLockElement !== renderer.domElement) return;
+ yaw -= e.movementX * 0.002;
 });
 
-// =================== COLISION ===================
-function collide(obj,next){
- const box=new THREE.Box3().setFromObject(obj);
- const delta=next.clone().sub(obj.position);
- box.min.add(delta);
- box.max.add(delta);
-
+// =================== COLISIÓN SIMPLE ===================
+function hit(obj,next){
+ const box = new THREE.Box3().setFromObject(obj);
+ const delta = next.clone().sub(obj.position);
+ box.min.add(delta); box.max.add(delta);
  for(const b of buildings){
-  if(box.intersectsBox(new THREE.Box3().setFromObject(b)))return true;
- }
-
- for(const c of cops){
-  if(obj!==c && box.intersectsBox(new THREE.Box3().setFromObject(c)))return true;
+  if(box.intersectsBox(new THREE.Box3().setFromObject(b))) return true;
  }
  return false;
 }
@@ -127,80 +108,63 @@ function collide(obj,next){
 // =================== LOOP ===================
 function animate(){
  requestAnimationFrame(animate);
- if(!scene||!camera||!renderer)return;
- if(!isFinite(yaw)){yaw=Math.PI;pitch=0;}
 
- // -------- JUGADOR --------
+ // JUGADOR
  if(!inCar){
-  const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-  if(keys.w)velocity.add(dir.clone().multiplyScalar(0.05));
-  if(keys.s)velocity.add(dir.clone().multiplyScalar(-0.05));
-  const next=player.position.clone().add(velocity);
-  if(!collide(player,next))player.position.copy(next);
-  else velocity.multiplyScalar(-0.2);
-  velocity.multiplyScalar(0.85);
-
-  if(keys.e && player.position.distanceTo(car.position)<3 && !carDestroyed){
-   inCar=true;
-  }
+  const dir = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+  let next = player.position.clone();
+  if(keys.w) next.add(dir.multiplyScalar(0.15));
+  if(keys.s) next.add(dir.multiplyScalar(-0.15));
+  if(!hit(player,next)) player.position.copy(next);
+  if(keys.e && player.position.distanceTo(car.position)<3 && !carDestroyed){ inCar=true; }
  }
 
- // -------- COCHE --------
+ // COCHE
  if(inCar && !carDestroyed){
-  if(keys.w)carSpeed+=0.02;
-  if(keys.s)carSpeed-=0.02;
-  carSpeed*=0.98;
-
-  car.rotation.y=yaw;
-  const dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-  const next=car.position.clone().add(dir.multiplyScalar(carSpeed));
-
-  if(!collide(car,next)){
+  if(keys.w) carSpeed += 0.03;
+  if(keys.s) carSpeed -= 0.03;
+  carSpeed *= 0.96;
+  car.rotation.y = yaw;
+  const dir = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+  const next = car.position.clone().add(dir.multiplyScalar(carSpeed));
+  if(!hit(car,next)){
    car.position.copy(next);
   }else{
-   carSpeed*=-0.3;
-   carHealth-=15;
+   carSpeed = 0;
+   carHealth -= 25;
    car.material.color.setHSL(0,Math.max(0,carHealth/100),0.5);
-   if(carHealth<=0){
-    carDestroyed=true;
-    carSpeed=0;
-   }
+   if(carHealth<=0){ carDestroyed=true; }
   }
   player.position.copy(car.position);
-  if(keys.q)inCar=false;
+  if(keys.q) inCar=false;
  }
 
- if(carDestroyed){carSpeed=0;}
-
- // -------- POLICIA --------
- cops.forEach(c=>{
-  if(stars>0){
-   const d=player.position.clone().sub(c.position).normalize();
-   c.position.add(d.multiplyScalar(0.05));
-  }
- });
-
- // -------- CAMARA --------
- const target=inCar?car:player;
- const dist=inCar?12:10;
- camera.position.copy(target.position).add(new THREE.Vector3(
-  Math.sin(yaw)*dist,
-  6,
-  Math.cos(yaw)*dist
- ));
+ // CÁMARA
+ const target = inCar ? car : player;
+ camera.position.set(
+  target.position.x + Math.sin(yaw)*10,
+  target.position.y + 6,
+  target.position.z + Math.cos(yaw)*10
+ );
  camera.lookAt(target.position);
 
- // -------- HUD --------
- const hud=document.getElementById('hud');
- if(hud){
-  hud.innerHTML=carDestroyed
-   ? '💥 Coche destruido · Q salir'
-   : `⭐ Estrellas: ${Math.floor(stars)}<br>${inCar?'🚗 Vida: '+Math.max(0,Math.floor(carHealth)):'WASD mover · E coche · Q salir'}`;
- }
+ // HUD
+ const hud = document.getElementById('hud');
+ hud.innerHTML = carDestroyed
+  ? '💥 Coche destruido'
+  : inCar
+   ? `🚗 Vida: ${carHealth}`
+   : 'WASD mover · E coche';
 
  renderer.render(scene,camera);
 }
+
 animate();
+
+}catch(e){
+ document.body.innerHTML = '<pre style="color:red">ERROR:\n'+e+'</pre>';
+ console.error(e);
+}
 </script>
 </body>
 </html>
