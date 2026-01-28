@@ -2,55 +2,57 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Mini GTA 3D – Base</title>
+<title>Movimiento Test</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body {
+html, body {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background: #87ceeb;
 }
-#hud {
+canvas {
+  display: block;
+}
+#msg {
   position: fixed;
   top: 10px;
   left: 10px;
   color: white;
-  font-family: Arial, sans-serif;
-  text-shadow: 1px 1px 2px black;
+  font-family: Arial;
+  background: rgba(0,0,0,0.5);
+  padding: 6px 10px;
   z-index: 10;
 }
 </style>
 </head>
-<body>
-<div id="hud">WASD para moverte</div>
+<body tabindex="0">
+<div id="msg">Haz click y usa WASD</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 <script>
-// ESCENA
+// --- ESCENA ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
-// CÁMARA
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
+// --- CÁMARA ---
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
 camera.position.set(0, 5, 10);
 
-// RENDER
+// --- RENDER ---
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// LUCES
+// --- LUCES ---
 scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.position.set(10, 20, 10);
 scene.add(sun);
 
-// SUELO
+// --- SUELO ---
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(200, 200),
   new THREE.MeshStandardMaterial({ color: 0x4caf50 })
@@ -58,38 +60,43 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
-// JUGADOR
+// --- JUGADOR ---
 const player = new THREE.Mesh(
-  new THREE.BoxGeometry(1, 2, 1),
-  new THREE.MeshStandardMaterial({ color: 0xff4444 })
+  new THREE.CapsuleGeometry(0.5, 1.0, 4, 8),
+  new THREE.MeshStandardMaterial({ color: 0x2266ff })
 );
 player.position.y = 1;
 scene.add(player);
 
-// CONTROLES
+// --- INPUT ---
 const keys = {};
-document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+document.body.focus();
 
-// LOOP
+document.addEventListener("keydown", e => {
+  keys[e.code] = true;
+});
+document.addEventListener("keyup", e => {
+  keys[e.code] = false;
+});
+
+// --- LOOP ---
 function animate() {
   requestAnimationFrame(animate);
 
-  const speed = 0.12;
+  const speed = 0.15;
 
-  if (keys.w) player.position.z -= speed;
-  if (keys.s) player.position.z += speed;
-  if (keys.a) player.position.x -= speed;
-  if (keys.d) player.position.x += speed;
+  if (keys["KeyW"]) player.position.z -= speed;
+  if (keys["KeyS"]) player.position.z += speed;
+  if (keys["KeyA"]) player.position.x -= speed;
+  if (keys["KeyD"]) player.position.x += speed;
 
-  // CÁMARA SIGUE AL JUGADOR
   camera.position.lerp(
     new THREE.Vector3(
       player.position.x,
       5,
       player.position.z + 10
     ),
-    0.1
+    0.15
   );
   camera.lookAt(player.position);
 
@@ -98,9 +105,12 @@ function animate() {
 
 animate();
 
-// RESIZE
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+// --- RESIZE ---
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.se
-
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
