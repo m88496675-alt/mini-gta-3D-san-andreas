@@ -76,6 +76,7 @@ scene.add(car);
 let carSpeed = 0;
 let carHealth = 100;
 let carDestroyed = false;
+let stars = 0;
 
 // =================== CONTROLES ===================
 const keys = {};
@@ -132,11 +133,18 @@ function animate(){
   }else{
    carSpeed = 0;
    carHealth -= 25;
+   stars = Math.min(5, stars + 1);
    car.material.color.setHSL(0,Math.max(0,carHealth/100),0.5);
    if(carHealth<=0){ carDestroyed=true; }
   }
   player.position.copy(car.position);
   if(keys.q) inCar=false;
+ }
+
+ if(inCar && carDestroyed){
+  inCar = false;
+  player.position.set(car.position.x+2,1,car.position.z);
+ }
  }
 
  // CÁMARA
@@ -150,11 +158,13 @@ function animate(){
 
  // HUD
  const hud = document.getElementById('hud');
- hud.innerHTML = carDestroyed
-  ? '💥 Coche destruido'
-  : inCar
-   ? `🚗 Vida: ${carHealth}`
-   : 'WASD mover · E coche';
+ if(carDestroyed){
+   hud.innerHTML = `💥 Coche destruido<br>⭐ Estrellas: ${stars}`;
+  }else if(inCar){
+   hud.innerHTML = `🚗 Vida: ${carHealth}<br>⭐ Estrellas: ${stars}`;
+  }else{
+   hud.innerHTML = `WASD mover · E coche<br>⭐ Estrellas: ${stars}`;
+  }
 
  renderer.render(scene,camera);
 }
