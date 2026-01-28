@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Mini GTA 3D – Colisiones</title>
+<title>Mini GTA 3D</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 html, body {
@@ -25,37 +25,7 @@ html, body {
 </style>
 </head>
 <body>
-<div id="ui">WASD moverte • Mouse cámara</div>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
-<script><!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Mini GTA 3D – Colisiones</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-html, body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #87ceeb;
-}
-#ui {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  color: white;
-  font-family: Arial, sans-serif;
-  background: rgba(0,0,0,0.6);
-  padding: 6px 10px;
-  z-index: 10;
-}
-</style>
-</head>
-<body>
-<div id="ui">WASD moverte • Mouse cámara</div>
+<div id="ui">WASD mover • Mouse cámara • Espacio saltar</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 <script>
@@ -64,7 +34,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
 // CÁMARA
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
 
 // RENDER
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -72,7 +42,7 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // LUCES
-scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.position.set(10, 20, 10);
 scene.add(sun);
@@ -88,88 +58,132 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 scene.add(floor);
 
+// CARRETERA
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, MAP_SIZE),
+  new THREE.MeshStandardMaterial({ color: 0x222222 })
+);
+road.rotation.x = -Math.PI / 2;
+road.position.y = 0.01;
+scene.add(road);
+
+// LINEAS VIALES
+for (let z = -MAP_SIZE/2; z < MAP_SIZE/2; z += 10) {
+  const line = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 4),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  line.rotation.x = -Math.PI / 2;
+  line.position.set(0, 0.02, z);
+  scene.add(line);
+}
+
+// EDIFICIOS
+for (let i = 0; i < 80; i++) {
+  const h = Math.random() * 10 + 4;
+  const building = new THREE.Mesh(
+    new THREE.BoxGeometry(4, h, 4),
+    new THREE.MeshStandardMaterial({ color: 0x777777 })
+  );
+
+  building.position.set(
+    (Math.random() - 0.5) * 180,
+    h / 2,
+    (Math.random() - 0.5) * 180
+  );
+
+  scene.add(building);
+}
+
 // JUGADOR
 const player = new THREE.Mesh(
-  new THREE.BoxGeometry(1, 2, 1),
+  new THREE.CapsuleGeometry(0.5, 1, 4, 8),
   new THREE.MeshStandardMaterial({ color: 0x3366ff })
 );
-player.position.set(0, 5, 0);
+player.position.set(0, 2, 0);
 scene.add(player);
 
 // INPUT
 const keys = {};
-document.addEventListener("keydown", e => keys[e.code] = true);
-document.addEventListener("keyup", e => keys[e.code] = false);
+addEventListener("keydown", e => keys[e.code] = true);
+addEventListener("keyup", e => keys[e.code] = false);
 
-// CÁMARA ROTACIÓN
+// MOUSE
 let yaw = 0;
 let pitch = 0;
 
-document.body.addEventListener("click", () => {
-  document.body.requestPointerLock();
-});
+document.body.onclick = () => document.body.requestPointerLock();
 
-document.addEventListener("mousemove", e => {
+addEventListener("mousemove", e => {
   if (document.pointerLockElement === document.body) {
     yaw -= e.movementX * 0.002;
     pitch -= e.movementY * 0.002;
-    pitch = Math.max(-0.4, Math.min(0.6, pitch));
+    pitch = Math.max(-0.4, Math.min(0.5, pitch));
   }
 });
 
-// FÍSICA SIMPLE
+// FÍSICA
+const velocity = new THREE.Vector3();
 let velocityY = 0;
-const GRAVITY = -0.02;
-const FLOOR_Y = 1;
+
+const ACCEL = 0.04;
+const MAX_SPEED = 0.25;
+const FRICTION = 0.85;
+const GRAVITY = -0.03;
+const JUMP = 0.55;
+
+let onGround = false;
+
+// CÁMARA SUAVE
+const camPos = new THREE.Vector3();
 
 // LOOP
 function animate() {
   requestAnimationFrame(animate);
 
-  const speed = 0.15;
+  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 
-  const forward = new THREE.Vector3(
-    Math.sin(yaw),
-    0,
-    Math.cos(yaw)
-  );
-  const right = new THREE.Vector3(
-    Math.cos(yaw),
-    0,
-    -Math.sin(yaw)
-  );
+  if (keys.KeyW) velocity.addScaledVector(forward, ACCEL);
+  if (keys.KeyS) velocity.addScaledVector(forward, -ACCEL);
+  if (keys.KeyA) velocity.addScaledVector(right, -ACCEL);
+  if (keys.KeyD) velocity.addScaledVector(right, ACCEL);
 
-  if (keys.KeyW) player.position.addScaledVector(forward, speed);
-  if (keys.KeyS) player.position.addScaledVector(forward, -speed);
-  if (keys.KeyA) player.position.addScaledVector(right, -speed);
-  if (keys.KeyD) player.position.addScaledVector(right, speed);
+  velocity.clampLength(0, MAX_SPEED);
+  velocity.multiplyScalar(FRICTION);
+  player.position.add(velocity);
 
-  // GRAVEDAD
+  if (keys.Space && onGround) {
+    velocityY = JUMP;
+    onGround = false;
+  }
+
   velocityY += GRAVITY;
   player.position.y += velocityY;
 
-  // COLISIÓN CON SUELO
-  if (player.position.y < FLOOR_Y) {
-    player.position.y = FLOOR_Y;
+  if (player.position.y < 1) {
+    player.position.y = 1;
     velocityY = 0;
+    onGround = true;
   }
 
-  // LÍMITES DEL MAPA
-  const limit = MAP_SIZE / 2 - 1;
-  player.position.x = Math.max(-limit, Math.min(limit, player.position.x));
-  player.position.z = Math.max(-limit, Math.min(limit, player.position.z));
+  const limit = MAP_SIZE / 2 - 2;
+  player.position.x = THREE.MathUtils.clamp(player.position.x, -limit, limit);
+  player.position.z = THREE.MathUtils.clamp(player.position.z, -limit, limit);
 
-  // CÁMARA
-  const camOffset = new THREE.Vector3(
-    Math.sin(yaw) * -8,
-    5 + pitch * 5,
-    Math.cos(yaw) * -8
-  );
-  camera.position.copy(player.position).add(camOffset);
+  const desiredCam = new THREE.Vector3(
+    Math.sin(yaw) * -7,
+    4 + pitch * 4,
+    Math.cos(yaw) * -7
+  ).add(player.position);
+
+  camPos.lerp(desiredCam, 0.1);
+  camera.position.copy(camPos);
   camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
 
   renderer.render(scene, camera);
 }
+
 animate();
 
 // RESIZE
@@ -177,12 +191,6 @@ addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-});
-</script>
-</body>
-</html>
-
-ght);
 });
 </script>
 </body>
