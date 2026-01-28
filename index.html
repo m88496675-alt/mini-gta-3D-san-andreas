@@ -28,6 +28,36 @@ html, body {
 <div id="ui">WASD moverte • Mouse cámara</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
+<script><!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mini GTA 3D – Colisiones</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #87ceeb;
+}
+#ui {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  color: white;
+  font-family: Arial, sans-serif;
+  background: rgba(0,0,0,0.6);
+  padding: 6px 10px;
+  z-index: 10;
+}
+</style>
+</head>
+<body>
+<div id="ui">WASD moverte • Mouse cámara</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 <script>
 // ESCENA
 const scene = new THREE.Scene();
@@ -147,6 +177,12 @@ addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
+
+ght);
 });
 </script>
 </body>
