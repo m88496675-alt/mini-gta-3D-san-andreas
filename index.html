@@ -87,6 +87,7 @@ function collide(box){for(const b of buildings){if(box.intersectsBox(b.userData.
 // LOOP
 function animate(){requestAnimationFrame(animate);
 
+ // --- JUGADOR A PIE ---
  if(!inCar){
   playerVel.set(0,0,0);
   if(keys.w)playerVel.z=-0.15;
@@ -97,9 +98,16 @@ function animate(){requestAnimationFrame(animate);
   if(!collide(playerBox(next)))player.position.copy(next);
  }
 
+ // --- ENTRAR / SALIR COCHE ---
  if(keys.e&&player.position.distanceTo(car.position)<3)inCar=true;
  if(keys.q)inCar=false;
 
+ // --- ROTACIÓN DEL COCHE CON MOUSE ---
+ if(inCar){
+  car.rotation.y = yaw;
+ }
+
+ // --- COCHE ---
  if(inCar){
   if(keys.w)carSpeed+=0.02;
   if(keys.s)carSpeed-=0.02;
@@ -107,19 +115,41 @@ function animate(){requestAnimationFrame(animate);
   const dir=new THREE.Vector3(0,0,-1).applyQuaternion(car.quaternion);
   const next=car.position.clone().addScaledVector(dir,carSpeed);
   let blocked=collide(vehicleBox(next));
-  police.forEach(p=>{if(vehicleBox(next).intersectsBox(vehicleBox(p.position))){blocked=true;stars=Math.min(5,stars+0.3);}});
+  police.forEach(p=>{
+   if(vehicleBox(next).intersectsBox(vehicleBox(p.position))){
+    blocked=true;stars=Math.min(5,stars+0.3);
+   }
+  });
   if(!blocked)car.position.copy(next); else carSpeed*=-0.3;
   player.position.copy(car.position);
  }
 
- if(stars>0){police.forEach(p=>{const dir=player.position.clone().sub(p.position).normalize();p.position.addScaledVector(dir,0.05);
-  const pBox=vehicleBox(p.position);
-  if(!inCar&&pBox.intersectsBox(playerBox(player.position))){playerVel.multiplyScalar(-0.3);stars=Math.min(5,stars+0.1);} });}
+ // --- POLICÍA ---
+ if(stars>0){
+  police.forEach(p=>{
+   const dir=player.position.clone().sub(p.position).normalize();
+   p.position.addScaledVector(dir,0.05);
+   const pBox=vehicleBox(p.position);
+   if(!inCar&&pBox.intersectsBox(playerBox(player.position))){
+    playerVel.multiplyScalar(-0.3);
+    stars=Math.min(5,stars+0.1);
+   }
+  });
+ }
 
+ // --- HUD ---
  document.getElementById('stars').textContent=Math.floor(stars);
- const camOffset=new THREE.Vector3(Math.sin(yaw)*10,6+pitch*4,Math.cos(yaw)*10);
- camera.position.copy(player.position).add(camOffset);
- camera.lookAt(player.position);
+
+ // --- CÁMARA (A PIE Y EN COCHE) ---
+ const target = inCar ? car.position : player.position;
+ const camOffset = new THREE.Vector3(
+  Math.sin(yaw)*10,
+  6 + pitch*4,
+  Math.cos(yaw)*10
+ );
+ camera.position.copy(target).add(camOffset);
+ camera.lookAt(target);
+
  renderer.render(scene,camera);
 }
 animate();
