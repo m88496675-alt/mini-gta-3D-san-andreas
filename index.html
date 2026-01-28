@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Mini GTA 3D – Cámara</title>
+<title>Mini GTA 3D – Colisiones</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 html, body {
@@ -25,7 +25,7 @@ html, body {
 </style>
 </head>
 <body>
-<div id="ui">CLICK para cámara • WASD moverte</div>
+<div id="ui">WASD moverte • Mouse cámara</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 <script>
@@ -47,9 +47,12 @@ const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.position.set(10, 20, 10);
 scene.add(sun);
 
+// MAPA
+const MAP_SIZE = 200;
+
 // SUELO
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(300, 300),
+  new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE),
   new THREE.MeshStandardMaterial({ color: 0x3fa34d })
 );
 floor.rotation.x = -Math.PI / 2;
@@ -60,7 +63,7 @@ const player = new THREE.Mesh(
   new THREE.BoxGeometry(1, 2, 1),
   new THREE.MeshStandardMaterial({ color: 0x3366ff })
 );
-player.position.y = 1;
+player.position.set(0, 5, 0);
 scene.add(player);
 
 // INPUT
@@ -80,9 +83,14 @@ document.addEventListener("mousemove", e => {
   if (document.pointerLockElement === document.body) {
     yaw -= e.movementX * 0.002;
     pitch -= e.movementY * 0.002;
-    pitch = Math.max(-0.5, Math.min(0.8, pitch));
+    pitch = Math.max(-0.4, Math.min(0.6, pitch));
   }
 });
+
+// FÍSICA SIMPLE
+let velocityY = 0;
+const GRAVITY = -0.02;
+const FLOOR_Y = 1;
 
 // LOOP
 function animate() {
@@ -106,13 +114,27 @@ function animate() {
   if (keys.KeyA) player.position.addScaledVector(right, -speed);
   if (keys.KeyD) player.position.addScaledVector(right, speed);
 
-  // CÁMARA TERCERA PERSONA
+  // GRAVEDAD
+  velocityY += GRAVITY;
+  player.position.y += velocityY;
+
+  // COLISIÓN CON SUELO
+  if (player.position.y < FLOOR_Y) {
+    player.position.y = FLOOR_Y;
+    velocityY = 0;
+  }
+
+  // LÍMITES DEL MAPA
+  const limit = MAP_SIZE / 2 - 1;
+  player.position.x = Math.max(-limit, Math.min(limit, player.position.x));
+  player.position.z = Math.max(-limit, Math.min(limit, player.position.z));
+
+  // CÁMARA
   const camOffset = new THREE.Vector3(
     Math.sin(yaw) * -8,
     5 + pitch * 5,
     Math.cos(yaw) * -8
   );
-
   camera.position.copy(player.position).add(camOffset);
   camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
 
@@ -129,3 +151,4 @@ addEventListener("resize", () => {
 </script>
 </body>
 </html>
+
